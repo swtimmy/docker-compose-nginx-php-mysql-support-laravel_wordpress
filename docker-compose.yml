@@ -1,0 +1,73 @@
+version: "3"
+
+networks:
+  SWTNetwork:
+
+services:
+  nginx:
+    image: nginx:stable-alpine
+    container_name: nginx
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - $PWD/html:/usr/share/nginx/html
+      - $PWD/conf/nginx:/etc/nginx/conf.d
+      - $PWD/certbot/conf:/etc/nginx/ssl
+      - $PWD/certbot/data:/usr/share/nginx/html/letsencrypt
+      - $PWD/certbot/dhparam:/etc/nginx/dhparam
+    volumes_from:
+      - php
+    depends_on:
+      - php
+      - mysql
+    # uncomment it after server build success
+    command: '/bin/sh -c ''while :; do sleep 6h & wait $${!}; nginx -s reload; done & nginx -g "daemon off;"'''
+    networks:
+      - SWTNetwork
+
+  certbot:
+    image: certbot/certbot:latest
+    # comment it after server build success
+    #command: certonly --webroot --webroot-path=/usr/share/nginx/html/letsencrypt --email [Your-Email-Address] --agree-tos --no-eff-email --force-renewal -d wordpress.Your-Domain.com
+    volumes:
+      - $PWD/certbot/conf:/etc/letsencrypt
+      - $PWD/certbot/logs:/var/log/letsencrypt
+      - $PWD/certbot/data:/usr/share/nginx/html/letsencrypt
+    depends_on:
+      - nginx
+    # uncomment it after server build success
+    entrypoint: "/bin/sh -c 'trap exit TERM; while :; do certbot renew; sleep 12h & wait $${!}; done;'"
+    networks:
+      - SWTNetwork
+
+  mysql:
+    image: mysql:5.7.22
+    container_name: mysql
+    restart: unless-stopped
+    tty: true
+    ports:
+      - "3306:3306"
+    volumes:
+      - $PWD/conf/mysql:/var/lib/mysql
+    environment:
+      MYSQL_DATABASE: testDB
+      MYSQL_USER: testUser
+      MYSQL_PASSWORD: testPassword
+      MYSQL_ROOT_PASSWORD: Ddeemmoo1234!
+    networks:
+      - SWTNetwork
+
+  php:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: php
+    volumes:
+      - $PWD/html:/var/www/html
+      - $PWD/vhost:/var/www/vhost
+      - $PWD/conf/php/custom.ini:/usr/local/etc/php/conf.d/custom.ini
+    ports:
+      - "9000:9000"
+    networks:
+      - SWTNetwork

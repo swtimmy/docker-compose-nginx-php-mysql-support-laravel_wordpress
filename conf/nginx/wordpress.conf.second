@@ -1,0 +1,49 @@
+server {
+    listen [::]:80;
+    listen 80;
+
+    server_name wordpress.Your-Domain.com;
+
+    location ~ /.well-known/acme-challenge {
+         allow all; 
+         root /usr/share/nginx/html/letsencrypt;
+    }
+
+    # redirect http to https
+    return 301 https://wordpress.Your-Domain.com$request_uri;
+}
+
+server {
+    listen [::]:443 ssl http2;
+    listen 443 ssl http2;
+
+    server_name wordpress.Your-Domain.com;
+
+    # SSL code
+    ssl_certificate /etc/nginx/ssl/live/wordpress.Your-Domain.com/fullchain.pem;
+    ssl_certificate_key /etc/nginx/ssl/live/wordpress.Your-Domain.com/privkey.pem;
+    # help cert score get A marks
+    include /etc/nginx/dhparam/options-ssl-nginx.conf;
+    ssl_dhparam /etc/nginx/dhparam/ssl-dhparams.pem;
+
+    client_max_body_size 20M;
+    root  /var/www/vhost/Your-Domain.com/wordpress;
+#        access_log /var/www/vhost/Your-Domain.com/wordpress/logs/access.log;
+#        error_log /var/www/vhost/Your-Domain.com/wordpress/logs/error.log;
+    index index.php index.html index.htm;
+    
+    if (!-e $request_filename) {
+        rewrite ^(.+)$ /index.php?q=$1 last;
+    }
+
+    location ~ .php$ {
+            #try_files $uri =404;
+            fastcgi_pass php:9000;
+            fastcgi_index index.php;
+            include  fastcgi_params;
+            fastcgi_split_path_info       ^(.+\.php)(/.+)$;
+            fastcgi_param PATH_INFO       $fastcgi_path_info;
+            fastcgi_param SCRIPT_FILENAME $document_root$fastcgi_script_name;
+            #fastcgi_read_timeout 300;
+    }
+} 
